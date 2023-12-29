@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # You can specify multiple services here like MySQL, PostgreSQL, Other Microservices, etc.
+  app:  
+    container_name: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ENV_KEY:  Development
+    volumes:
+      - ./:/app
+    ports:
+      - 9090:9090
+    depends_on:
+      - db
+  db:
+    image:  mysql:5.7
+    environment:
+      MYSQL_DATABASE: amifind
+      # So you don't have to use root, but you can if you like
+      MYSQL_USER: ami
+      # You can use whatever password you like
+      MYSQL_PASSWORD: '!numsey123#'
+      # Password for root access
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - 3306:3306
+    volumes:
+      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/schema.sql
