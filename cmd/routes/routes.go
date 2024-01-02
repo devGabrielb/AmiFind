@@ -3,7 +3,8 @@ package routes
 import (
 	"database/sql"
 
-	"github.com/devGabrielb/AmiFind/internal/pets/handler"
+	"github.com/devGabrielb/AmiFind/internal/handlers"
+	"github.com/devGabrielb/AmiFind/internal/repositories"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -18,27 +19,24 @@ type routes struct {
 }
 
 func New(fb *fiber.App, db *sql.DB) Router {
-	return &routes{fb: fb}
+	return &routes{fb: fb, db: db}
 }
 
 func (r *routes) MapRoutes() {
 	r.rg = r.fb.Group("/api")
-	r.rg.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("rodando bem")
-	})
-	r.buildCustomerRoutes()
+	r.buildUserRoutes()
 	r.buildPostRoutes()
 	r.buildPetRoutes()
 }
 
-func (r *routes) buildCustomerRoutes() {
-	r.rg.Get("/customer", func(c *fiber.Ctx) error {
-		return c.SendString("cusomers")
-	})
+func (r *routes) buildUserRoutes() {
+	repo := repositories.NewRepository(r.db)
+	handle := handlers.NewUserHandler(repo)
+
+	r.rg.Post("/register", handle.Register)
 }
 
 func (r *routes) buildPetRoutes() {
-	r.rg.Get("/pets", handler.Get)
 }
 
 func (r *routes) buildPostRoutes() {
