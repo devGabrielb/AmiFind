@@ -50,3 +50,4 @@ _cgo_export.*
 tmp
 #scripts
 scripts/schema.sql
+scripts/values.sql
