@@ -19,7 +19,7 @@ func main() {
 		err = godotenv.Load()
 	}
 	if err != nil {
-		log.Printf(".env not loadedA")
+		log.Printf(".env not loaded")
 	}
 	app := fiber.New()
 
@@ -27,11 +27,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
+
 	err = db.Ping()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	defer db.Close()
 
 	routes := routes.New(app, db)
 	routes.MapRoutes()
