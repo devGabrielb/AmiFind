@@ -34,6 +34,7 @@ func (r *routes) buildUserRoutes() {
 	handle := handlers.NewUserHandler(repo)
 
 	r.rg.Post("/register", handle.Register)
+	r.rg.Post("/register", handle.Login)
 }
 
 func (r *routes) buildPetRoutes() {
