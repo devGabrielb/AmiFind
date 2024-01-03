@@ -10,16 +10,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var err error
-
 func main() {
 	env := os.Getenv("ENV_KEY")
 
 	if env != "Production" {
-		err = godotenv.Load()
-	}
-	if err != nil {
-		log.Printf(".env not loaded")
+		err := godotenv.Load()
+		if err != nil {
+			panic(err)
+		}
 	}
 	app := fiber.New()
 
@@ -28,14 +26,15 @@ func main() {
 		panic(err)
 	}
 
-	err = db.Ping()
-	if err != nil {
+	if err := db.Ping(); err != nil {
 		log.Fatal(err)
 	}
 
 	defer db.Close()
 
 	routes := routes.New(app, db)
-	routes.MapRoutes()
+	if err := routes.MapRoutes(); err != nil {
+		log.Fatal(err)
+	}
 	log.Fatal(app.Listen(":9090"))
 }
