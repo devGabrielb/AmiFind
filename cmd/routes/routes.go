@@ -3,6 +3,7 @@ package routes
 import (
 	"database/sql"
 
+	"github.com/devGabrielb/AmiFind/cmd/api/middleware"
 	"github.com/devGabrielb/AmiFind/internal/handlers"
 	"github.com/devGabrielb/AmiFind/internal/repositories"
 	"github.com/gofiber/fiber/v2"
@@ -34,10 +35,13 @@ func (r *routes) buildUserRoutes() {
 	handle := handlers.NewUserHandler(repo)
 
 	r.rg.Post("/register", handle.Register)
-	r.rg.Post("/register", handle.Login)
+	r.rg.Post("/login", handle.Login)
 }
 
 func (r *routes) buildPetRoutes() {
+	r.rg.Get("/pets", middleware.Auth(), func(c *fiber.Ctx) error {
+		return c.SendString("pets!!!!")
+	})
 }
 
 func (r *routes) buildPostRoutes() {

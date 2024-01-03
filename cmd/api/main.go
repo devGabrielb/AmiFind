@@ -33,8 +33,7 @@ func main() {
 	defer db.Close()
 
 	routes := routes.New(app, db)
-	if err := routes.MapRoutes(); err != nil {
-		log.Fatal(err)
-	}
+	routes.MapRoutes()
+
 	log.Fatal(app.Listen(":9090"))
 }
