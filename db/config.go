@@ -14,7 +14,11 @@ type Config struct {
 	}
 }
 
-func newConfig() *Config {
+func tryGetConfigDB() (*Config, error) {
+	envs, err := env.TryGetEnvList("DB_HOST", "DB_PORT", "DB_USER", "DB_NAME", "DB_PASS")
+	if err != nil {
+		return nil, err
+	}
 	return &Config{
 		database: struct {
 			Host   string
@@ -23,11 +27,11 @@ func newConfig() *Config {
 			DbName string
 			Pass   string
 		}{
-			Host:   env.TryGetEnv("DB_HOST"),
-			Port:   env.TryGetEnv("DB_PORT"),
-			User:   env.TryGetEnv("DB_USER"),
-			DbName: env.TryGetEnv("DB_NAME"),
-			Pass:   env.TryGetEnv("DB_PASS"),
+			Host:   envs["DB_HOST"],
+			Port:   envs["DB_PORT"],
+			User:   envs["DB_USER"],
+			DbName: envs["DB_NAME"],
+			Pass:   envs["DB_PASS"],
 		},
-	}
+	}, nil
 }
