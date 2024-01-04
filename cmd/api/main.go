@@ -8,13 +8,25 @@ import (
 	"github.com/devGabrielb/AmiFind/db"
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
 
+func init() {
+}
+
 func main() {
+	logrus.SetOutput(os.Stdout)
+	logrus.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: "03-01-2024 22:22:50",
+	})
+
+	logrus.SetLevel(logrus.InfoLevel)
+
 	env := os.Getenv("ENV_KEY")
 
 	if env != "Production" {
 		err := godotenv.Load()
+		logrus.Info("Development environment")
 		if err != nil {
 			panic(err)
 		}
