@@ -1,6 +1,7 @@
 package env
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -10,21 +11,28 @@ const (
 	DEVELOPMENT = "Development"
 )
 
-func TryGetEnv(key string) string {
+func TryGetEnv(key string) (string, error) {
 	env, ok := os.LookupEnv(key)
 	if !ok || env == "" {
-		err := fmt.Errorf("environment variable not found: %s", key)
-		panic(err)
+		return "", fmt.Errorf("environment variable not found: %s", key)
 	}
-	return env
+	return env, nil
 }
 
-func LoadEnvironment(environmentKey string, fn func(...string) error) {
-	v := TryGetEnv(environmentKey)
-	if v != PRODUCTION {
-		err := fn()
+func TryGetEnvList(keys ...string) (mapKey map[string]string, errorList error) {
+	mapKey = make(map[string]string)
+	for _, k := range keys {
+		key, err := TryGetEnv(k)
 		if err != nil {
-			panic(err)
+			errorList = errors.Join(err)
 		}
+		mapKey[k] = key
+
+		if errorList != nil {
+			return map[string]string{}, errorList
+		}
+
 	}
+
+	return mapKey, nil
 }
