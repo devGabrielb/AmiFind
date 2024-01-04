@@ -21,11 +21,11 @@ func NewRepository(db *sql.DB) UserRepository {
 }
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (entities.User, error) {
-	query := "SELECT id profile_pcture,name,email,password,phoneNumber,location FROM users WHERE email=$1;"
+	query := "SELECT id,profile_picture,name,email,password,phoneNumber,location FROM users WHERE email=?;"
 	row := r.db.QueryRowContext(ctx, query, email)
 	user := entities.User{}
 
-	err := row.Scan(&user.Id, &user.Profile_picture, &user.Name, &user.Email, &user.Password, &user.Location)
+	err := row.Scan(&user.Id, &user.Profile_picture, &user.Name, &user.Email, &user.Password, &user.PhoneNumber, &user.Location)
 	if err != nil {
 		return entities.User{}, err
 	}
