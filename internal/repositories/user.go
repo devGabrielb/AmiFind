@@ -9,7 +9,7 @@ import (
 
 type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (entities.User, error)
-	Create(ctx context.Context, user entities.User) error
+	Create(ctx context.Context, user entities.User) (int64, error)
 }
 
 type userRepository struct {
@@ -33,13 +33,17 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (entitie
 	return user, nil
 }
 
-func (r *userRepository) Create(ctx context.Context, user entities.User) error {
-	_, err := r.db.ExecContext(
+func (r *userRepository) Create(ctx context.Context, user entities.User) (int64, error) {
+	u, err := r.db.ExecContext(
 		ctx,
 		"INSERT INTO users(profile_picture,name, email, password, phoneNumber, location) VALUES (?,?,?,?,?,?);",
 		user.Profile_picture, user.Name, user.Email, user.Password, user.PhoneNumber, user.Location)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	id, err := u.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
