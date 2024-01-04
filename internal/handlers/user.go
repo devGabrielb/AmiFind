@@ -115,5 +115,6 @@ func (u *userHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
 	}
 
+	logrus.WithField("user_id", user.Id).Info("User logged successfully")
 	return c.Status(fiber.StatusOK).JSON(dtos.LoginResponse{Id: user.Id, Email: user.Email, Token: token})
 }
