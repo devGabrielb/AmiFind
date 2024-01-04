@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"strconv"
 
-	"github.com/devGabrielb/AmiFind/internal/entities"
+	"github.com/devGabrielb/AmiFind/internal/dtos"
 	"github.com/devGabrielb/AmiFind/internal/repositories"
+	"github.com/devGabrielb/AmiFind/internal/utils"
+
+	"github.com/devGabrielb/AmiFind/internal/entities"
 	"github.com/devGabrielb/AmiFind/internal/services"
 	"github.com/devGabrielb/AmiFind/pkg/env"
 	"github.com/gofiber/fiber/v2"
@@ -12,29 +16,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserRegisterRequest struct {
-	Profile_picture_url string `json:"profilePictureUrl" validate:"required,max=255"`
-	Name                string `json:"name" validate:"required,max=24"`
-	Email               string `json:"email" validate:"required,max=24"`
-	Password            string `json:"password" validate:"required,max=12"`
-	PhoneNumber         string `json:"phoneNumber" validate:"required,max=20"`
-	Location            string `json:"location" validate:"required,max=255"`
-}
-
-type LoginRequest struct {
-	Email    string `json:"email" validate:"required,max=24"`
-	Password string `json:"password" validate:"required,max=12"`
-}
-
-type LoginResponse struct {
-	Email string `json:"email,omitempty"`
-	Token string `json:"token,omitempty"`
-	Id    int    `json:"id,omitempty"`
-}
-
-func (u *UserRegisterRequest) Validate() error {
-	return nil
-}
+var (
+	ErrInvalidJson        = errors.New("invalid json")
+	ErrNotFound           = errors.New("user not found")
+	ErrInvalidDto         = errors.New("invalid request")
+	ErrCannotCreateUser   = errors.New("cannot create user")
+	ErrEncryptPassword    = errors.New("error while encrypting password")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrGenerateToken      = errors.New("error generating token")
+	ErrGetSecretKey       = errors.New("error getting secret key")
+)
 
 type userHandler struct {
 	repo repositories.UserRepository
@@ -45,14 +37,21 @@ func NewUserHandler(repo repositories.UserRepository) *userHandler {
 }
 
 func (u *userHandler) Register(c *fiber.Ctx) error {
-	userRequest := UserRegisterRequest{}
+
+	userRequest := dtos.RegisterRequest{}
 
 	if err := c.BodyParser(&userRequest); err != nil {
-		return err
+
+		logrus.WithField("error", err).Error(ErrInvalidJson.Error())
+		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrInvalidJson.Error()))
 	}
-	pass, err := bcrypt.GenerateFromPassword([]byte(userRequest.Password), 5)
+
+	pass, err := utils.EncryptPassword(userRequest.Password)
+
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"Message": "Erro ao criptografar senha"})
+
+		logrus.WithField("error", err).Error(ErrEncryptPassword.Error())
+		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrEncryptPassword.Error()))
 	}
 
 	user := entities.User{
@@ -63,42 +62,58 @@ func (u *userHandler) Register(c *fiber.Ctx) error {
 		PhoneNumber:     userRequest.PhoneNumber,
 		Location:        userRequest.Location,
 	}
-	if err := u.repo.Create(c.Context(), user); err != nil {
-		logrus.WithField("error", err.Error()).Error("error while request user by email")
-		return err
-	}
+	id, err := u.repo.Create(c.Context(), user)
 
+	if err != nil {
+		logrus.WithField("error", err.Error()).Error(ErrCannotCreateUser.Error())
+		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrCannotCreateUser.Error()))
+	}
+	logrus.WithField("user_id", id).Info("User created successfully")
 	return c.Status(201).JSON(nil)
 }
 
 func (u *userHandler) Login(c *fiber.Ctx) error {
-	loginRequest := LoginRequest{}
+
+	loginRequest := dtos.LoginRequest{}
+
 	if err := c.BodyParser(&loginRequest); err != nil {
-		return err
+
+		logrus.WithField("error", err).Error(ErrInvalidJson.Error())
+		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrInvalidJson.Error()))
 	}
 
 	user, err := u.repo.FindByEmail(c.Context(), loginRequest.Email)
+
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "user not found"})
+
+		logrus.WithField("email", loginRequest.Email).Debug(dtos.NewError(fiber.StatusNotFound, ErrNotFound.Error()))
+		return c.Status(fiber.StatusNotFound).JSON(dtos.NewError(fiber.StatusNotFound, ErrNotFound.Error()))
 	}
 
+	logrus.WithField("user_id", user.Id).Info("Found user successfully")
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password)); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+
+		logrus.WithField("error", err).Debug(dtos.NewError(fiber.StatusBadRequest, ErrInvalidCredentials.Error()))
+		return c.Status(fiber.StatusBadRequest).JSON(dtos.NewError(fiber.StatusBadRequest, ErrInvalidCredentials.Error()))
 	}
 
 	env, err := env.TryGetEnv("SECRET_KEY")
+
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
+
+		logrus.WithField("error", err).Error(dtos.NewError(fiber.StatusInternalServerError, ErrGetSecretKey.Error()))
+		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrGetSecretKey.Error()))
 	}
 
 	t := services.NewToken(env)
-
 	token, err := t.GenerateToken(strconv.Itoa(user.Id))
+
 	if err != nil {
+
+		logrus.WithField("error", err).Error(dtos.NewError(fiber.StatusInternalServerError, ErrGenerateToken.Error()))
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(LoginResponse{Id: user.Id, Email: user.Email, Token: token})
+	return c.Status(fiber.StatusOK).JSON(dtos.LoginResponse{Id: user.Id, Email: user.Email, Token: token})
 }
