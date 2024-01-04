@@ -15,12 +15,13 @@ func init() {
 }
 
 func main() {
+	logrus.SetReportCaller(true)
 	logrus.SetOutput(os.Stdout)
 	logrus.SetFormatter(&logrus.JSONFormatter{
 		TimestampFormat: "03-01-2024 22:22:50",
 	})
 
-	logrus.SetLevel(logrus.InfoLevel)
+	logrus.SetLevel(logrus.DebugLevel)
 
 	env := os.Getenv("ENV_KEY")
 
