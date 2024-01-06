@@ -31,10 +31,10 @@ var (
 )
 
 type userHandler struct {
-	repo repositories.UserRepository
+	repo repositories.Repository
 }
 
-func NewUserHandler(repo repositories.UserRepository) *userHandler {
+func NewUserHandler(repo repositories.Repository) *userHandler {
 	return &userHandler{repo: repo}
 }
 
