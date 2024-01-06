@@ -3,7 +3,9 @@ package handlers
 import (
 	"errors"
 	"strconv"
+	"strings"
 
+	"github.com/devGabrielb/AmiFind/cmd/api/response"
 	"github.com/devGabrielb/AmiFind/internal/dtos"
 	"github.com/devGabrielb/AmiFind/internal/repositories"
 	"github.com/devGabrielb/AmiFind/internal/utils"
@@ -42,20 +44,25 @@ func (u *userHandler) Register(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&userRequest); err != nil {
 
-		logrus.WithField("error", err).Error(ErrInvalidJson.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrInvalidJson.Error()))
+		logrus.WithField("error", err).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrInvalidJson.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, ErrInvalidJson.Error())
 	}
 
 	pass, err := utils.EncryptPassword(userRequest.Password)
 
 	if err != nil {
 
-		logrus.WithField("error", err).Error(ErrEncryptPassword.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrEncryptPassword.Error()))
+		logrus.WithField("error", err).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrEncryptPassword.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, ErrEncryptPassword.Error())
+	}
+
+	if err := dtos.Validate(userRequest); err != nil {
+		logrus.WithField("errors", strings.Split(err.Error(), "\n")).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrInvalidDto.Error()})
+		return response.ErrorWithDetails(c, fiber.StatusInternalServerError, ErrInvalidDto.Error(), strings.Split(err.Error(), "\n"))
 	}
 
 	user := entities.User{
-		Profile_picture: userRequest.Profile_picture_url,
+		Profile_picture: userRequest.Profile_picture,
 		Name:            userRequest.Name,
 		Email:           userRequest.Email,
 		Password:        string(pass),
@@ -65,11 +72,11 @@ func (u *userHandler) Register(c *fiber.Ctx) error {
 	id, err := u.repo.Create(c.Context(), user)
 
 	if err != nil {
-		logrus.WithField("error", err.Error()).Error(ErrCannotCreateUser.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrCannotCreateUser.Error()))
+		logrus.WithField("error", err.Error()).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrCannotCreateUser.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, ErrCannotCreateUser.Error())
 	}
 	logrus.WithField("user_id", id).Info("User created successfully")
-	return c.Status(201).JSON(nil)
+	return response.Success(c, fiber.StatusCreated, nil)
 }
 
 func (u *userHandler) Login(c *fiber.Ctx) error {
@@ -78,32 +85,36 @@ func (u *userHandler) Login(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&loginRequest); err != nil {
 
-		logrus.WithField("error", err).Error(ErrInvalidJson.Error())
-		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrInvalidJson.Error()))
+		logrus.WithField("error", err).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrInvalidJson.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, ErrInvalidJson.Error())
 	}
+	if err := dtos.Validate(loginRequest); err != nil {
+		logrus.WithField("errors", strings.Split(err.Error(), "\n")).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrInvalidDto.Error()})
+		return response.ErrorWithDetails(c, fiber.StatusInternalServerError, ErrInvalidDto.Error(), strings.Split(err.Error(), "\n"))
 
+	}
 	user, err := u.repo.FindByEmail(c.Context(), loginRequest.Email)
 
 	if err != nil {
 
-		logrus.WithField("email", loginRequest.Email).Debug(dtos.NewError(fiber.StatusNotFound, ErrNotFound.Error()))
-		return c.Status(fiber.StatusNotFound).JSON(dtos.NewError(fiber.StatusNotFound, ErrNotFound.Error()))
+		logrus.WithField("email", loginRequest.Email).Debug(response.Response{Code: fiber.StatusNotFound, Msg: ErrNotFound.Error()})
+		return response.Error(c, fiber.StatusNotFound, ErrNotFound.Error())
 	}
 
 	logrus.WithField("user_id", user.Id).Info("Found user successfully")
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password)); err != nil {
 
-		logrus.WithField("error", err).Debug(dtos.NewError(fiber.StatusBadRequest, ErrInvalidCredentials.Error()))
-		return c.Status(fiber.StatusBadRequest).JSON(dtos.NewError(fiber.StatusBadRequest, ErrInvalidCredentials.Error()))
+		logrus.WithField("error", err).Debug(response.Response{Code: fiber.StatusBadRequest, Msg: ErrInvalidCredentials.Error()})
+		return response.Error(c, fiber.StatusBadRequest, ErrInvalidCredentials.Error())
 	}
 
 	env, err := env.TryGetEnv("SECRET_KEY")
 
 	if err != nil {
 
-		logrus.WithField("error", err).Error(dtos.NewError(fiber.StatusInternalServerError, ErrGetSecretKey.Error()))
-		return c.Status(fiber.StatusInternalServerError).JSON(dtos.NewError(fiber.StatusInternalServerError, ErrGetSecretKey.Error()))
+		logrus.WithField("error", err).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrGetSecretKey.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, ErrGetSecretKey.Error())
 	}
 
 	t := services.NewToken(env)
@@ -111,10 +122,10 @@ func (u *userHandler) Login(c *fiber.Ctx) error {
 
 	if err != nil {
 
-		logrus.WithField("error", err).Error(dtos.NewError(fiber.StatusInternalServerError, ErrGenerateToken.Error()))
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
+		logrus.WithField("error", err).Error(response.Response{Code: fiber.StatusInternalServerError, Msg: ErrGenerateToken.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, ErrGenerateToken.Error())
 	}
 
 	logrus.WithField("user_id", user.Id).Info("User logged successfully")
-	return c.Status(fiber.StatusOK).JSON(dtos.LoginResponse{Id: user.Id, Email: user.Email, Token: token})
+	return response.Success(c, fiber.StatusOK, dtos.LoginResponse{Id: user.Id, Email: user.Email, Token: token})
 }
