@@ -2,13 +2,12 @@ package dtos
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/devGabrielb/AmiFind/internal/entities"
 	"github.com/go-playground/validator/v10"
 )
-
-var v *validator.Validate
 
 type RegisterRequest struct {
 	Profile_picture string `json:"profile_picture" validate:"required,http_url"`
@@ -35,25 +34,11 @@ type LoginResponse struct {
 }
 
 func Validate(entity interface{}) error {
-	value, ok := entity.(struct{})
-	if !ok {
-		return entities.NewInvalidParams()
-	}
-	fieldErrors, err := validateEntity(value)
-	if err != nil {
-		return nil
-	}
-	if len(fieldErrors) > 0 {
-		e := entities.NewInvalidParams()
-		e.AddParameters(fieldErrors)
-		return e
-	}
-	return nil
-}
+	v := validator.New(validator.WithRequiredStructEnabled())
 
-func validateEntity(entity struct{}) ([]string, error) {
-
+	log.Println("1", entity)
 	fields := make([]string, 0)
+	log.Println("2", entity)
 
 	customErrorMessages := map[string]string{
 		"required": "is required and cannot be empty",
@@ -64,13 +49,18 @@ func validateEntity(entity struct{}) ([]string, error) {
 	}
 
 	err := v.Struct(entity)
+	log.Println("1", entity)
+
 	if err != nil {
-		if _, ok := err.(*validator.InvalidValidationError); ok {
-			return nil, err
+		if e, ok := err.(*validator.InvalidValidationError); ok {
+			log.Println("4", entity)
+
+			return e
 		}
 	}
 
 	for _, validationErr := range err.(validator.ValidationErrors) {
+		log.Println(validationErr.Param())
 		fieldName := strings.ToLower(validationErr.Field())
 		message, found := customErrorMessages[validationErr.Tag()]
 
@@ -78,8 +68,13 @@ func validateEntity(entity struct{}) ([]string, error) {
 			continue
 		}
 
-		field := fmt.Sprintf("The field %s %s.\n", fieldName, fmt.Sprintf(message, validationErr.Param()))
+		field := fmt.Sprintf("The field %s %s.", fieldName, fmt.Sprintf(message, validationErr.Param()))
 		fields = append(fields, field)
 	}
-	return fields, nil
+	if len(fields) > 0 {
+		e := entities.NewInvalidParams()
+		e.AddParameters(fields)
+		return e
+	}
+	return nil
 }
