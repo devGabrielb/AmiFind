@@ -6,6 +6,7 @@ import (
 	"github.com/devGabrielb/AmiFind/cmd/api/middleware"
 	"github.com/devGabrielb/AmiFind/internal/handlers"
 	"github.com/devGabrielb/AmiFind/internal/repositories"
+	"github.com/devGabrielb/AmiFind/internal/services"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -32,7 +33,8 @@ func (r *routes) MapRoutes() {
 
 func (r *routes) buildUserRoutes() {
 	repo := repositories.NewRepository(r.db)
-	handle := handlers.NewUserHandler(repo)
+	service := services.NewService(repo)
+	handle := handlers.NewUserHandler(service)
 
 	r.rg.Post("/register", handle.Register)
 	r.rg.Post("/login", handle.Login)
