@@ -1,6 +1,10 @@
 package dtos
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/devGabrielb/AmiFind/internal/entities"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -30,13 +34,52 @@ type LoginResponse struct {
 	Id    int    `json:"id,omitempty"`
 }
 
-func Validate(model interface{}) error {
-
-	v = validator.New(validator.WithRequiredStructEnabled())
-	err := v.Struct(model)
+func Validate(entity interface{}) error {
+	value, ok := entity.(struct{})
+	if !ok {
+		return entities.NewInvalidParams()
+	}
+	fieldErrors, err := validateEntity(value)
 	if err != nil {
-		return err
-
+		return nil
+	}
+	if len(fieldErrors) > 0 {
+		e := entities.NewInvalidParams()
+		e.AddParameters(fieldErrors)
+		return e
 	}
 	return nil
+}
+
+func validateEntity(entity struct{}) ([]string, error) {
+
+	fields := make([]string, 0)
+
+	customErrorMessages := map[string]string{
+		"required": "is required and cannot be empty",
+		"http_url": "must be a valid HTTP URL",
+		"email":    "must be a valid email address",
+		"max":      "must be at most %s characters long",
+		"e164":     "must be a valid phone number",
+	}
+
+	err := v.Struct(entity)
+	if err != nil {
+		if _, ok := err.(*validator.InvalidValidationError); ok {
+			return nil, err
+		}
+	}
+
+	for _, validationErr := range err.(validator.ValidationErrors) {
+		fieldName := strings.ToLower(validationErr.Field())
+		message, found := customErrorMessages[validationErr.Tag()]
+
+		if !found {
+			continue
+		}
+
+		field := fmt.Sprintf("The field %s %s.\n", fieldName, fmt.Sprintf(message, validationErr.Param()))
+		fields = append(fields, field)
+	}
+	return fields, nil
 }
