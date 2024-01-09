@@ -17,7 +17,7 @@ func NewDb() (*sql.DB, error) {
 
 	config := c.database
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.User, config.Pass, config.Host, config.Port, config.DbName)
+	connStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4,utf8&collation=utf8mb4_general_ci", config.User, config.Pass, config.Host, config.Port, config.DbName)
 	db, err := sql.Open("mysql", connStr)
 	if err != nil {
 		return nil, err
