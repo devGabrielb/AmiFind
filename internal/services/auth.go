@@ -25,22 +25,22 @@ var (
 	ErrInvalidParams      = errors.New("invalid parameters")
 )
 
-type Service interface {
+type AuthService interface {
 	Register(ctx context.Context, registerRequest dtos.RegisterRequest) (int64, error)
 	Login(ctx context.Context, loginRequest dtos.LoginRequest) (dtos.LoginResponse, error)
 }
 
-type service struct {
+type authService struct {
 	repository repositories.UserRepository
 }
 
-func NewService(repo repositories.UserRepository) Service {
-	return &service{
+func NewService(repo repositories.UserRepository) AuthService {
+	return &authService{
 		repository: repo,
 	}
 }
 
-func (s *service) Login(ctx context.Context, loginRequest dtos.LoginRequest) (dtos.LoginResponse, error) {
+func (s *authService) Login(ctx context.Context, loginRequest dtos.LoginRequest) (dtos.LoginResponse, error) {
 
 	user, err := s.repository.FindByEmail(ctx, loginRequest.Email)
 
@@ -71,7 +71,7 @@ func (s *service) Login(ctx context.Context, loginRequest dtos.LoginRequest) (dt
 	return dtos.LoginResponse{Email: user.Email, Id: user.Id, Token: token}, nil
 }
 
-func (s *service) Register(ctx context.Context, registerRequest dtos.RegisterRequest) (int64, error) {
+func (s *authService) Register(ctx context.Context, registerRequest dtos.RegisterRequest) (int64, error) {
 
 	pass, err := utils.EncryptPassword(registerRequest.Password)
 

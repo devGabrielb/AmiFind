@@ -21,15 +21,15 @@ var (
 	ErrInvalidDto         = errors.New("invalid request")
 )
 
-type userHandler struct {
-	service services.Service
+type UserHandler struct {
+	service services.AuthService
 }
 
-func NewUserHandler(service services.Service) *userHandler {
-	return &userHandler{service: service}
+func NewUserHandler(service services.AuthService) *UserHandler {
+	return &UserHandler{service: service}
 }
 
-func (u *userHandler) Register(c *fiber.Ctx) error {
+func (u *UserHandler) Register(c *fiber.Ctx) error {
 
 	registerRequest := dtos.RegisterRequest{}
 
@@ -39,22 +39,24 @@ func (u *userHandler) Register(c *fiber.Ctx) error {
 	}
 
 	if err := dtos.Validate(registerRequest); err != nil {
-		errorParams, ok := err.(*entities.InvalidParameters)
-		if !ok {
-			return response.Error(c, fiber.StatusInternalServerError, ErrInvalidDto.Error())
+		if err != nil {
+			errorParams, ok := err.(*entities.InvalidParameters)
+			if ok {
+				return response.ErrorWithDetails(c, fiber.StatusBadRequest, errorParams.Error(), errorParams.Params)
+			}
 		}
-		return response.ErrorWithDetails(c, fiber.StatusBadRequest, errorParams.Error(), errorParams.Params)
+		return response.Error(c, fiber.StatusInternalServerError, ErrInvalidDto.Error())
 	}
 
-	user_id, err := u.service.Register(c.Context(), registerRequest)
+	userAuth_id, err := u.service.Register(c.Context(), registerRequest)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error())
 	}
-	logrus.WithField("user_id", user_id).Info("User created successfully")
-	return response.Success(c, fiber.StatusCreated, fiber.Map{"id": user_id})
+	logrus.WithField("userId", userAuth_id).Info("User created successfully")
+	return response.Success(c, fiber.StatusCreated, fiber.Map{"id": userAuth_id})
 }
 
-func (u *userHandler) Login(c *fiber.Ctx) error {
+func (u *UserHandler) Login(c *fiber.Ctx) error {
 
 	loginRequest := dtos.LoginRequest{}
 
@@ -70,7 +72,7 @@ func (u *userHandler) Login(c *fiber.Ctx) error {
 		return response.ErrorWithDetails(c, fiber.StatusInternalServerError, errorParams.Error(), errorParams.Params)
 	}
 
-	user, err := u.service.Login(c.Context(), loginRequest)
+	userAuth, err := u.service.Login(c.Context(), loginRequest)
 	if err != nil {
 		if err.Error() == ErrInvalidCredentials.Error() {
 			return response.Error(c, fiber.StatusBadRequest, ErrGenerateToken.Error())
@@ -79,6 +81,6 @@ func (u *userHandler) Login(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, ErrGenerateToken.Error())
 	}
 
-	logrus.WithField("user_id", user.Id).Info("User logged successfully")
-	return response.Success(c, fiber.StatusOK, user)
+	logrus.WithField("userId", userAuth.Id).Info("User logged successfully")
+	return response.Success(c, fiber.StatusOK, userAuth)
 }
