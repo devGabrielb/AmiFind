@@ -32,7 +32,7 @@ func (r *routes) MapRoutes() {
 }
 
 func (r *routes) buildUserRoutes() {
-	repo := repositories.NewRepository(r.db)
+	repo := repositories.NewUserRepository(r.db)
 	service := services.NewService(repo)
 	handle := handlers.NewUserHandler(service)
 
@@ -47,4 +47,9 @@ func (r *routes) buildPetRoutes() {
 }
 
 func (r *routes) buildPostRoutes() {
+	repo := repositories.NewPostRepository(r.db)
+	service := services.NewPostService(repo)
+	handle := handlers.NewPostHandler(service)
+	// /posts?skip=10&take=10
+	r.rg.Get("/posts", handle.Get)
 }
