@@ -2,7 +2,6 @@ package dtos
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/devGabrielb/AmiFind/internal/entities"
@@ -36,9 +35,7 @@ type LoginResponse struct {
 func Validate(entity interface{}) error {
 	v := validator.New(validator.WithRequiredStructEnabled())
 
-	log.Println("1", entity)
 	fields := make([]string, 0)
-	log.Println("2", entity)
 
 	customErrorMessages := map[string]string{
 		"required": "is required and cannot be empty",
@@ -49,27 +46,24 @@ func Validate(entity interface{}) error {
 	}
 
 	err := v.Struct(entity)
-	log.Println("1", entity)
 
 	if err != nil {
 		if e, ok := err.(*validator.InvalidValidationError); ok {
-			log.Println("4", entity)
 
 			return e
 		}
-	}
 
-	for _, validationErr := range err.(validator.ValidationErrors) {
-		log.Println(validationErr.Param())
-		fieldName := strings.ToLower(validationErr.Field())
-		message, found := customErrorMessages[validationErr.Tag()]
+		for _, validationErr := range err.(validator.ValidationErrors) {
+			fieldName := strings.ToLower(validationErr.Field())
+			message, found := customErrorMessages[validationErr.Tag()]
 
-		if !found {
-			continue
+			if !found {
+				continue
+			}
+
+			field := fmt.Sprintf("The field %s %s.", fieldName, fmt.Sprintf(message, validationErr.Param()))
+			fields = append(fields, field)
 		}
-
-		field := fmt.Sprintf("The field %s %s.", fieldName, fmt.Sprintf(message, validationErr.Param()))
-		fields = append(fields, field)
 	}
 	if len(fields) > 0 {
 		e := entities.NewInvalidParams()
