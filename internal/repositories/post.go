@@ -23,6 +23,22 @@ type postRepository struct {
 func NewPostRepository(db *sql.DB) PostRepository {
 	return &postRepository{db: db}
 }
+func (pr *postRepository) Store(ctx context.Context, post entities.Post) (int64, error) {
+	query, err := pr.db.PrepareContext(ctx, "INSERT INTO posts(title,description, date, pet_id) VALUES(?, ?, ?, ?)")
+	if err != nil {
+		return 0, err
+	}
+	p, err := query.ExecContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	postId, err := p.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return postId, nil
+}
 
 func (pr *postRepository) GetPostPaged(ctx context.Context, page int) (*PostPaged, error) {
 
@@ -47,7 +63,7 @@ func (pr *postRepository) GetPostPaged(ctx context.Context, page int) (*PostPage
 
 		post := entities.Post{}
 
-		if err := rows.Scan(&post.Id, &post.Title, &post.Description, &post.Date, &post.Pet_id); err != nil {
+		if err := rows.Scan(&post.Id, &post.Title, &post.Description, &post.Date, &post.PetId); err != nil {
 			return nil, err
 		}
 
