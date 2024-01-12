@@ -8,4 +8,4 @@ test:
 	docker-compose run unittest
 
 run-dev:
-	go run cmd/api/main.go
+	go run cmd/main.go
