@@ -3,7 +3,7 @@ package routes
 import (
 	"database/sql"
 
-	"github.com/devGabrielb/AmiFind/cmd/api/middleware"
+	"github.com/devGabrielb/AmiFind/api/middleware"
 	"github.com/devGabrielb/AmiFind/internal/handlers"
 	"github.com/devGabrielb/AmiFind/internal/repositories"
 	"github.com/devGabrielb/AmiFind/internal/services"
@@ -29,6 +29,7 @@ func (r *routes) MapRoutes() {
 	r.buildUserRoutes()
 	r.buildPostRoutes()
 	r.buildPetRoutes()
+	r.buildAdvertisingRoutes()
 }
 
 func (r *routes) buildUserRoutes() {
@@ -52,4 +53,12 @@ func (r *routes) buildPostRoutes() {
 	handle := handlers.NewPostHandler(service)
 	// /posts?skip=10&take=10
 	r.rg.Get("/posts", handle.Get)
+}
+
+func (r *routes) buildAdvertisingRoutes() {
+	repo := repositories.NewAdvertisingRepository(r.db)
+	service := services.NewAdvertisingService(repo)
+	handle := handlers.NewAdvertisingHandler(service)
+
+	r.rg.Post("/advertising", middleware.Auth(), handle.Create)
 }
