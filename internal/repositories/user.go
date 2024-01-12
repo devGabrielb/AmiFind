@@ -21,11 +21,11 @@ func NewUserRepository(db *sql.DB) UserRepository {
 }
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (entities.User, error) {
-	query := "SELECT id,profile_picture,name,email,password,phoneNumber,location FROM users WHERE email=?;"
+	query := "SELECT id,profilePicture,name,email,password,phoneNumber,location FROM users WHERE email=?;"
 	row := r.db.QueryRowContext(ctx, query, email)
 	user := entities.User{}
 
-	err := row.Scan(&user.Id, &user.Profile_picture, &user.Name, &user.Email, &user.Password, &user.PhoneNumber, &user.Location)
+	err := row.Scan(&user.Id, &user.ProfilePicture, &user.Name, &user.Email, &user.Password, &user.PhoneNumber, &user.Location)
 	if err != nil {
 		return entities.User{}, err
 	}
@@ -36,8 +36,8 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (entitie
 func (r *userRepository) Create(ctx context.Context, user entities.User) (int64, error) {
 	u, err := r.db.ExecContext(
 		ctx,
-		"INSERT INTO users(profile_picture,name, email, password, phoneNumber, location) VALUES (?,?,?,?,?,?);",
-		user.Profile_picture, user.Name, user.Email, user.Password, user.PhoneNumber, user.Location)
+		"INSERT INTO users(profilePicture,name, email, password, phoneNumber, location) VALUES (?,?,?,?,?,?);",
+		user.ProfilePicture, user.Name, user.Email, user.Password, user.PhoneNumber, user.Location)
 	if err != nil {
 		return 0, err
 	}
