@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/devGabrielb/AmiFind/internal/dtos"
 	"github.com/devGabrielb/AmiFind/internal/entities"
 	"github.com/devGabrielb/AmiFind/internal/repositories"
 	"github.com/devGabrielb/AmiFind/internal/utils"
@@ -26,8 +25,9 @@ var (
 )
 
 type AuthService interface {
-	Register(ctx context.Context, registerRequest dtos.RegisterRequest) (int64, error)
-	Login(ctx context.Context, loginRequest dtos.LoginRequest) (dtos.LoginResponse, error)
+	Register(ctx context.Context, user entities.User) (int64, error)
+	Login(ctx context.Context, email string, pass string) (entities.User, error)
+	GenerateToken(user entities.User) (string, error)
 }
 
 type authService struct {
@@ -40,25 +40,47 @@ func NewService(repo repositories.UserRepository) AuthService {
 	}
 }
 
-func (s *authService) Login(ctx context.Context, loginRequest dtos.LoginRequest) (dtos.LoginResponse, error) {
+func (s *authService) Login(ctx context.Context, email string, pass string) (entities.User, error) {
 
-	user, err := s.repository.FindByEmail(ctx, loginRequest.Email)
+	user, err := s.repository.FindByEmail(ctx, email)
 
 	if err != nil {
 
-		return dtos.LoginResponse{}, err
+		return entities.User{}, ErrNotFound
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(pass)); err != nil {
 
-		return dtos.LoginResponse{}, ErrInvalidCredentials
+		return entities.User{}, ErrInvalidCredentials
 	}
 
+	return user, nil
+}
+
+func (s *authService) Register(ctx context.Context, user entities.User) (int64, error) {
+
+	pass, err := utils.EncryptPassword(user.Password)
+
+	if err != nil {
+
+		return 0, err
+	}
+
+	user.Password = string(pass)
+	id, err := s.repository.Create(ctx, user)
+
+	if err != nil {
+		return 0, ErrNotFound
+	}
+	return id, nil
+}
+
+func (s *authService) GenerateToken(user entities.User) (string, error) {
 	env, err := env.TryGetEnv("SECRET_KEY")
 
 	if err != nil {
 
-		return dtos.LoginResponse{}, errors.Join(ErrGetSecretKey, err)
+		return "", errors.Join(ErrGetSecretKey, err)
 	}
 
 	t := NewToken(env)
@@ -66,32 +88,8 @@ func (s *authService) Login(ctx context.Context, loginRequest dtos.LoginRequest)
 
 	if err != nil {
 
-		return dtos.LoginResponse{}, errors.Join(ErrGenerateToken, err)
-	}
-	return dtos.LoginResponse{Email: user.Email, Id: user.Id, Token: token}, nil
-}
-
-func (s *authService) Register(ctx context.Context, registerRequest dtos.RegisterRequest) (int64, error) {
-
-	pass, err := utils.EncryptPassword(registerRequest.Password)
-
-	if err != nil {
-
-		return 0, err
+		return "", errors.Join(ErrGenerateToken, err)
 	}
 
-	user := entities.User{
-		Profile_picture: registerRequest.Profile_picture,
-		Name:            registerRequest.Name,
-		Email:           registerRequest.Email,
-		Password:        string(pass),
-		PhoneNumber:     registerRequest.PhoneNumber,
-		Location:        registerRequest.Location,
-	}
-	id, err := s.repository.Create(ctx, user)
-
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
+	return token, nil
 }

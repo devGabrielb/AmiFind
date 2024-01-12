@@ -3,22 +3,16 @@ package handlers
 import (
 	"errors"
 
-	"github.com/devGabrielb/AmiFind/cmd/api/response"
-	"github.com/devGabrielb/AmiFind/internal/dtos"
+	"github.com/devGabrielb/AmiFind/api/response"
 	"github.com/devGabrielb/AmiFind/internal/entities"
-
 	"github.com/devGabrielb/AmiFind/internal/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	ErrInvalidJson        = errors.New("invalid json")
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrGenerateToken      = errors.New("error generating token")
-	ErrGetSecretKey       = errors.New("error getting secret key")
-	ErrInvalidParams      = errors.New("invalid parameters")
-	ErrInvalidDto         = errors.New("invalid request")
+	ErrNotFound           = errors.New("user not found")
 )
 
 type UserHandler struct {
@@ -31,56 +25,80 @@ func NewUserHandler(service services.AuthService) *UserHandler {
 
 func (u *UserHandler) Register(c *fiber.Ctx) error {
 
-	registerRequest := dtos.RegisterRequest{}
-
+	registerRequest := entities.RegisterRequest{}
 	if err := c.BodyParser(&registerRequest); err != nil {
-
-		return response.Error(c, fiber.StatusInternalServerError, ErrInvalidJson.Error())
+		return response.UnprocessableEntity(c)
 	}
 
-	if err := dtos.Validate(registerRequest); err != nil {
-		if err != nil {
-			errorParams, ok := err.(*entities.InvalidParameters)
-			if ok {
-				return response.ErrorWithDetails(c, fiber.StatusBadRequest, errorParams.Error(), errorParams.Params)
+	if err := entities.Validate(registerRequest); err != nil {
+		if len(err) > 0 {
+
+			if err != nil {
+				_, ok := err[0].(*entities.ValidateError)
+				if ok {
+					return response.BadRequestWithErrors(c, err)
+				}
 			}
+			return response.BadRequest(c)
 		}
-		return response.Error(c, fiber.StatusInternalServerError, ErrInvalidDto.Error())
 	}
 
-	userAuth_id, err := u.service.Register(c.Context(), registerRequest)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, err.Error())
+	user := entities.User{
+		ProfilePicture: registerRequest.ProfilePicture,
+		Name:           registerRequest.Name,
+		Email:          registerRequest.Email,
+		Password:       registerRequest.Password,
+		PhoneNumber:    registerRequest.PhoneNumber,
+		Location:       registerRequest.Location,
 	}
-	logrus.WithField("userId", userAuth_id).Info("User created successfully")
-	return response.Success(c, fiber.StatusCreated, fiber.Map{"id": userAuth_id})
+
+	userId, err := u.service.Register(c.Context(), user)
+	if err != nil {
+		if err.Error() == ErrNotFound.Error() {
+			return response.NotFound(c)
+		}
+		return response.InternalServerError(c)
+	}
+
+	logrus.WithField("userId", userId).Info("User created successfully")
+	return response.Created(c, fiber.Map{"id": userId})
 }
 
 func (u *UserHandler) Login(c *fiber.Ctx) error {
 
-	loginRequest := dtos.LoginRequest{}
-
+	loginRequest := entities.LoginRequest{}
 	if err := c.BodyParser(&loginRequest); err != nil {
-
-		return response.Error(c, fiber.StatusInternalServerError, ErrInvalidJson.Error())
+		return response.UnprocessableEntity(c)
 	}
-	if err := dtos.Validate(loginRequest); err != nil {
-		errorParams, ok := err.(*entities.InvalidParameters)
-		if !ok {
-			return response.Error(c, fiber.StatusInternalServerError, ErrInvalidDto.Error())
+
+	if err := entities.Validate(loginRequest); err != nil {
+		if len(err) > 0 {
+
+			_, ok := err[0].(*entities.ValidateError)
+			if ok {
+				return response.BadRequestWithErrors(c, err)
+			}
+			return response.BadRequest(c)
 		}
-		return response.ErrorWithDetails(c, fiber.StatusInternalServerError, errorParams.Error(), errorParams.Params)
 	}
 
-	userAuth, err := u.service.Login(c.Context(), loginRequest)
+	user, err := u.service.Login(c.Context(), loginRequest.Email, loginRequest.Password)
 	if err != nil {
-		if err.Error() == ErrInvalidCredentials.Error() {
-			return response.Error(c, fiber.StatusBadRequest, ErrGenerateToken.Error())
-
+		if err.Error() == ErrNotFound.Error() {
+			return response.NotFound(c)
 		}
-		return response.Error(c, fiber.StatusInternalServerError, ErrGenerateToken.Error())
+		if err.Error() == ErrInvalidCredentials.Error() {
+			return response.BadRequest(c)
+		}
+		return response.InternalServerError(c)
 	}
 
-	logrus.WithField("userId", userAuth.Id).Info("User logged successfully")
-	return response.Success(c, fiber.StatusOK, userAuth)
+	token, err := u.service.GenerateToken(user)
+	if err != nil {
+		return response.InternalServerError(c)
+
+	}
+
+	logrus.WithField("userId", user.Id).Info("User logged successfully")
+	return response.OK(c, fiber.Map{"id": user.Id, "token": token})
 }
